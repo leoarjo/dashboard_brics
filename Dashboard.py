@@ -9,7 +9,7 @@ import plotly.express as px
 load_dotenv()
 
 st.set_page_config(layout="wide") # Define o layout da página como largo
-st.title("Dashboard BRICS")
+st.title("Dashboard BRICS") # Título do dashboard
 
 # Função para conectar ao banco de dados e carregar os dados
 @st.cache_data # Para armazenar em cache os dados e evitar múltiplas consultas
@@ -58,6 +58,7 @@ else:
     }, inplace=True)
 
     # Convertendo as colunas numéricas para o tipo correto e tratando erros
+    # 'errors='coerce' transforma valores não numéricos em NaN
     df_gdp['gdp_usd'] = pd.to_numeric(df_gdp['gdp_usd'], errors='coerce')
     df_population['population'] = pd.to_numeric(df_population['population'], errors='coerce')
 
@@ -135,10 +136,25 @@ else:
     col1, col2 = st.columns(2)
     with col1:
         st.write("#### Dados de PIB")
-        st.dataframe(df_gdp_filtered)
+        # Criar uma cópia para formatar e não alterar o DataFrame original usado nos gráficos
+        formatted_gdp_df = df_gdp_filtered.copy()
+        if 'gdp_usd' in formatted_gdp_df.columns:
+            # Formata o número com 2 casas decimais e separador de milhar (ponto) e decimal (vírgula)
+            # A 'gambiarra' com X é para trocar . por , e , por . no formato brasileiro
+            formatted_gdp_df['gdp_usd'] = formatted_gdp_df['gdp_usd'].apply(
+                lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(x) else ""
+            )
+        st.dataframe(formatted_gdp_df) # Exibe o DataFrame completo filtrado e formatado
     with col2:
         st.write("#### Dados de População")
-        st.dataframe(df_population_filtered)
+        # Criar uma cópia para formatar
+        formatted_pop_df = df_population_filtered.copy()
+        if 'population' in formatted_pop_df.columns:
+            # Formata o número como inteiro com separador de milhar (ponto) e decimal (vírgula)
+            formatted_pop_df['population'] = formatted_pop_df['population'].apply(
+                lambda x: f"{x:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(x) else ""
+            )
+        st.dataframe(formatted_pop_df) # Exibe o DataFrame completo filtrado e formatado
 
     st.markdown("---") # Separador visual
 
@@ -158,6 +174,8 @@ else:
             title="PIB (US$) ao Longo do Tempo",
             labels={"year": "Ano", "gdp_usd": "PIB (US$)", "country": "País"}
         )
+        # Formata os ticks do eixo Y para melhor legibilidade (milhões, bilhões, etc.)
+        fig_gdp_time.update_yaxes(tickformat=".2s", title="PIB (US$)") # .2s para notação científica ou prefixos SI
         st.plotly_chart(fig_gdp_time, use_container_width=True)
     else:
         st.info("Sem dados de PIB para o período ou países selecionados para exibir o gráfico.")
@@ -178,6 +196,7 @@ else:
             title="População ao Longo do Tempo",
             labels={"year": "Ano", "population": "População", "country": "País"}
         )
+        fig_pop_time.update_yaxes(tickformat=".0s", title="População") # .0s para notação científica ou prefixos SI (sem decimais)
         st.plotly_chart(fig_pop_time, use_container_width=True)
     else:
         st.info("Sem dados de população para o período ou países selecionados para exibir o gráfico.")
@@ -190,6 +209,7 @@ else:
         df_combined = pd.merge(df_gdp_filtered, df_population_filtered, on=['country', 'year'], how='inner', suffixes=('_gdp', '_pop'))
 
         if not df_combined.empty:
+            # Verifica se as colunas necessárias para o cálculo existem, são numéricas e evita divisão por zero
             if 'gdp_usd' in df_combined.columns and 'population' in df_combined.columns and \
                pd.api.types.is_numeric_dtype(df_combined['gdp_usd']) and pd.api.types.is_numeric_dtype(df_combined['population']) and \
                (df_combined['population'] != 0).all():
@@ -203,6 +223,7 @@ else:
                     title="PIB per Capita (US$) ao Longo do Tempo",
                     labels={"year": "Ano", "gdp_per_capita": "PIB per Capita (US$)", "country": "País"}
                 )
+                fig_gdp_per_capita.update_yaxes(tickformat=".2s", title="PIB per Capita (US$)")
                 st.plotly_chart(fig_gdp_per_capita, use_container_width=True)
             else:
                 st.info("Não foi possível calcular o PIB per capita. Verifique os dados de PIB e População ou se há divisão por zero.")
@@ -215,15 +236,35 @@ else:
 
     # Tabela Sumária (Exemplo: Dados do Último Ano Disponível)
     st.header("Dados Anuais Mais Recentes")
+    # Garante que df_combined exista e não esteja vazio antes de tentar usá-lo
     if 'df_combined' in locals() and not df_combined.empty:
         latest_year = df_combined['year'].max()
         df_latest_data = df_combined[df_combined['year'] == latest_year]
-        
+
+        # Define as colunas que esperamos exibir
         cols_to_display = ['country', 'year', 'gdp_usd', 'population', 'gdp_per_capita']
+        # Filtra para incluir apenas as colunas que realmente existem no DataFrame
         existing_cols = [col for col in cols_to_display if col in df_latest_data.columns]
-        
+
         if not df_latest_data.empty:
-            st.dataframe(df_latest_data[existing_cols].round(2))
+            # Criar uma cópia para formatar e não alterar o DataFrame original
+            formatted_latest_data = df_latest_data[existing_cols].copy()
+            
+            # Aplica a formatação para as colunas numéricas no formato brasileiro
+            if 'gdp_usd' in formatted_latest_data.columns:
+                formatted_latest_data['gdp_usd'] = formatted_latest_data['gdp_usd'].apply(
+                    lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(x) else ""
+                )
+            if 'population' in formatted_latest_data.columns:
+                formatted_latest_data['population'] = formatted_latest_data['population'].apply(
+                    lambda x: f"{x:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(x) else ""
+                )
+            if 'gdp_per_capita' in formatted_latest_data.columns:
+                formatted_latest_data['gdp_per_capita'] = formatted_latest_data['gdp_per_capita'].apply(
+                    lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notnull(x) else ""
+                )
+
+            st.dataframe(formatted_latest_data)
         else:
             st.info(f"Não há dados para o ano mais recente ({latest_year}) após a combinação e filtragem.")
     else:
