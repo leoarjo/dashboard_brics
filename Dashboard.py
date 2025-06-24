@@ -196,7 +196,7 @@ else:
             title="População ao Longo do Tempo",
             labels={"year": "Ano", "population": "População", "country": "País"}
         )
-        fig_pop_time.update_yaxes(tickformat=".0s", title="População") # .0s para notação científica ou prefixos SI (sem decimais)
+        fig_pop_time.update_yaxes(tickformat=",", title="População") # Mude para esta linha
         st.plotly_chart(fig_pop_time, use_container_width=True)
     else:
         st.info("Sem dados de população para o período ou países selecionados para exibir o gráfico.")
